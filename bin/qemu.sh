@@ -12,98 +12,34 @@
 # 	#qemu@irc.freenode.net
 # 	#virtualsquare@irc.freenode.net
 # 	#ubuntu@irc.freenode.net
-# pastebin:
-#   https://pzt.me/75uy
-#		http://img534.imageshack.us/img534/4631/networkingqemuvdebridge.png
 #
 
-# To enable 32-bit and 64-bit emulation (as guest hardware); steps:
-#sudo apt-get install libsdl1.2-dev
-#sudo apt-get install zlib1g-dev
-#sudo apt-get install libvde-dev libvde0 libvdeplug2 libvdeplug2-dev
-#sudo apt-get install libspice-server libspice-server-dev spice spice-protocol-dev libspice-client libspice-client-dev spice-client
-#cd
-#wget "http://download.savannah.gnu.org/releases/qemu/qemu-0.14.1.tar.gz"
-#tar -vxzf qemu-0.14.1.tar.gz -C /opt/qemu
-#cd /opt/qemu
-#
-#	--enable-spice \
-#	--enable-docs \
-#./configure \
-#	--prefix=/opt/qemu \
-#	--target-list=i386-softmmu,x86_64-softmmu,i386-linux-user,x86_64-linux-user \
-#	--enable-sdl \
-#	--enable-system \
-#	--enable-vde \
-#	--enable-curses \
-#	--enable-vnc-thread \
-#	--enable-debug
-#
-#make
-#sudo make install
-##make clean
-#cd /opt/qemu
-#/opt/qemu/bin/qemu-system-x86_64 -cpu qemu64 ...
-#
-#----------------------------------------------------------
-# Thinking to use QEMU like an application server, it could be 
-# helpful to hide it. Adding those option to Qemu command line 
-# does the job: 
-#   "-nographic -monitor null -serial null". 
-# The 
-# problem that could arise is that the shutdown command does 
-# not poweroff by default on many distributions, and qemu 
-# process remains running until you kill it in some way. To 
-# solve the problem, on my Ubuntu 6.06 server installation, I 
-# installed acpi and apm stuff and added the line 
-#   "apm power_off=1" 
-# to /etc/modules.
-#
-#apt-get install gtkvncviewer
-
-#
-# Backing file vs snapshot ?
-# ...
-#
-
-# vdeq qemu-kvm \
-#		-curses \
-#		-drive file=/lala.img,snapshot=off,cache=none,if=virtio,boot=on \
-#		-smp 2 -m 1G \
-#		-monitor telnet:127.0.0.1:9221,server,nowait
-#		-net vde,vlan=0 \
-#		-net nic,model=virtio,vlan=0,macaddr=52:54:00:00:AA:01 \
-#
-#	vdeq qemu-kvm \
-#		-curses \
-#		-drive file=nana.img,snapshot=off,cache=none,if=virtio,boot=on \
-#		-smp 2 -m 1G \
-#		-monitor telnet:127.0.0.1:9222,server,nowait
-#		-net vde,vlan=0 \
-#		-net nic,model=virtio,vlan=0,macaddr=52:54:00:00:AA:03 \
-#		-net vde,vlan=1 \
-#		-net nic,model=virtio,vlan=1,macaddr=52:54:00:00:AA:04
-
-#qemu -version
-#
-#QEMU32="/usr/bin/qemu"
-#QEMU64="/usr/bin/qemu-system-x86_64"
-#QEMU=${QEMU32}
-#QEMU32VDE="vdeqemu"
-#QEMUROOT="/opt/qemu/bin/" # custom compile									# compile with vde support
-QEMUROOT="/usr/bin" # custom compile									# compile with vde support
-#QEMUROOT="/usr/bin"	# default qemu ubuntu did not support vde									# compile with vde support
+# Qemu Version
+QEMUROOT="/usr/bin"
 QEMU32="${QEMUROOT}/qemu"
-#QEMU32="${QEMUROOT}/qemu-system-i386" # ?
 QEMU64="${QEMUROOT}/qemu-system-x86_64"
-QEMU=${QEMU32}														# ...
-#QEMU=${QEMU64}	# ?									# ...
-QEMU32VDE=${QEMU32}												# ...
-QEMU64VDE=${QEMU64}												# ...
-#QEMU="qemu-spice"			# ?
-#QEMU="qemu-kvm"				# ?
-#QEMU="qemu-kvm-spice"	# ?
+QEMU=${QEMU32}
+#QEMU=${QEMU64}
+QEMU32VDE=${QEMU32}
+QEMU64VDE=${QEMU64}
+#QEMU="qemu-spice"
+#QEMU="qemu-kvm"
+#QEMU="qemu-kvm-spice"
 
+# Boot device
+harddisk="c"
+cdrom="d"
+
+BASEDIR="/mnt/data/DATA/vm/qemu"
+BASEIMGDIR="img/base"
+DIFFIMGDIR="img/diff"
+
+ISODIR="/mnt/data/DATA/iso"
+ISODIR2="/home/najib/Downloads"
+
+READMEfile="${BASEDIR}/README.txt"
+
+#----------------------------------------------------------
 # qemu -cpu \?
 # qemu -cpu '?'
 #
@@ -130,22 +66,14 @@ _hostname() {
 	echo "$(hostname)"
 }
 
-# Boot device
-harddisk="c"
-cdrom="d"
+# Create tun-tap device?
+_createTun() {
+	modprobe tun
 
-BASEDIR="/mnt/data/DATA/vm/qemu"
-BASEIMGDIR="img/base"
-DIFFIMGDIR="img/diff"
-
-ISODIR="/mnt/data/DATA/iso"
-ISODIR2="/home/najib/Downloads"
-
-#UPSCRIPT="/etc/qemu-ifup"		# for qemu-bridge
-#DOWNSCRIPT="/etc/qemu-ifdown"		# for qemu-bridge
-
-READMEfile="${BASEDIR}/README.txt"
-
+	mkdir /dev/net
+	mknod /dev/net/tun c 10 200
+	chmod 660 /dev/net/tun
+}
 
 #----------------------------------------------------------
 function _create_baseimg() {
@@ -321,7 +249,13 @@ _resetImgPasswd() {
 # informations).
 #
 # (http://www.cavebear.com/archive/cavebear/Ethernet/vendor.html)
-# mac address for model realtec rtl1839 bermula dengan 00:E0:4C:
+# mac address for model realtec rtl1839 start with 00:E0:4C:
+#
+# ---------------------------------
+#    My Server's MAC Address
+# ---------------------------------
+# My MAC Address        My Hostname
+# -----------------     -----------
 # 00:e0:4c:bd:64:ba	bingka
 # 00:e0:4c:bd:64:bb	lengkuas
 # 00:e0:4c:bd:64:bc	perahu
@@ -333,6 +267,7 @@ _resetImgPasswd() {
 # 00:e0:4c:bd:64:cc	bahulu
 # 00:e0:4c:bd:64:cd	asamkeping
 # 00:e0:4c:bd:64:ce	amanda
+# ---------------------------------
 #
 function _random_mac() {
     # TODO: Generate random MAC address
@@ -341,62 +276,6 @@ function _random_mac() {
     echo ""
 }
 
-# TEST: study vde
-#$ vde_switch -d -s /tmp/vdeswitch0 -M /tmp/vdeswitch0mgmt -t tap0 -mod 666
-#$ brctl show
-#$ brctl addif br0 tap0
-#$ brctl show
-#$ unixterm /tmp/vdeswitch0mgmt
-#$ port/allprint
-#$ port/showinfo
-#$ logout
-## vde_switch -d -s /tmp/vdeswitch1 -M /tmp/vdeswitch1mgmt
-## unixterm /tmp/vdeswitch1mgmt
-## port/showinfo
-## logout
-#$ dpipe vde_plug -p 32 -m 666 /tmp/vdeswitch0 = vde_plug -p 32 -m 666 /tmp/vdeswitch1
-#$ vdeqemu ...
-#
-## brctl addbr br0
-## brctl addif br0 eth0
-## dhclient br0
-### tunctl -u najib -t tap5
-## vde_tunctl -u najib -t tap5
-### ifconfig tap5 up
-## ip link set tap5 up
-## brctl addif br0 tap5
-## brctl setfd br0 0
-#$ vde_switch -d -s /tmp/vdeswitch5 -M /tmp/vdeswitch5mgmt
-#$ unixterm /tmp/vdeswitch1mgmt
-##$ vdeterm /tmp/vdeswitch1mgmt
-#$ logout
-#$ vde_plug2tap -d -s /tmp/vdeswitch5 tap5
-#$ vdeqemu ... -net nic,macaddr=... -net vde,sock=/tmp/vdeswitch5
-	#${QEMU32} \
-	#-cdrom ${ISODIR3}/_freebsd-8.2/FreeBSD-8.2-RELEASE-i386-disc1.iso \
-	#-net vde,vlan=0,port=2,sock=/tmp/vdeswitch0 \
-	#-net nic,vlan=0,macaddr=00:e0:4c:bd:64:ba \
-	#-net vde,vlan=0,sock=/tmp/vdeswitch0,port=2 \
-	#-net nic,macaddr=00:e0:4c:bd:64:ba \
-	#-net vde,sock=/tmp/vdeswitch0,port=2 \
-	#-net vde,vlan=0,sock=/tmp/vdeswitch0,port=2 \
-	#-net vde,sock=/tmp/vdeswitch0,port=2 \
-	#-net vde,sock=/tmp/vdeswitch5 \
-#
-# 13:47 -!- Irssi: Join to #virtualsquare was synced in 2 secs
-# 14:03 < najib> http://img534.imageshack.us/img534/4631/networkingqemuvdebridge.png. i am trying to make this network setup. is that doable if
-#               the blue part was created by non-root user?
-# 14:49 < julius> najib: yup
-# 14:50 < julius> just give tap0 to a user - initialized with some ip or dhcpcd running
-# 15:39 < shammash> yes I think that's the simplest solution: use vde_tunctl -u testuser and then run everything (qemu/vde) with testuser
-# 15:40 < shammash> otherwise you have to play with a few vde_switch parameters to have the data socket writable for a certain group
-#
-# 18:08 < shammash> najib: you should bring up all the interfaces
-# 18:08 < shammash> if you're using eth0 for some host traffic you should use br0 instead
-# 18:10 < shammash> and for dhcp having 'brctl setfd br0 0' or something similar should help
-#
-#ifplugd
-#
 _startvdenet() {
   ## Load tun module
   #/sbin/modprobe tun 2>/dev/null
@@ -481,110 +360,8 @@ _stopvdenet() {
 
 
 #----------------------------------------------------------
-function _run_dodol() {
-	#-net nic,vlan=1,macaddr=00:83:39:5b:94:e9 \
-    ${QEMU} \
-	-hda ${BASEDIR}/${DIFFIMGDIR}/fedora14.dodol.qcow2.img \
-	-cdrom ${ISODIR}/Fedora-14-i386-disc1.iso \
-	-boot c \
-	-vga std \
-	-monitor stdio \
-	-soundhw es1370 \
-	-m 256 \
-	-cpu qemu32 \
-	-localtime \
-	-net nic,vlan=1,macaddr=00:e0:4c:bd:64:ca \
-	-net tap,vlan=1,ifname=tap0,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-	-name "dodol" 
-}
-
+# Guest config/start script
 #----------------------------------------------------------
-function _run_budu() {
-    ${QEMU32} \
-	-hda ${BASEDIR}/${DIFFIMGDIR}/fedora14.budu.qcow2 \
-	-cdrom ${ISODIR}/Fedora-14-i386-disc1.iso \
-	-boot c \
-	-vga std \
-	-monitor stdio \
-	-soundhw es1370 \
-	-cpu qemu32 \
-	-m 256 \
-	-no-reboot \
-	-localtime \
-	-net nic,vlan=0,macaddr=00:83:39:5b:94:ea \
-	-net tap,vlan=0,ifname=tap15,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-	-name "budu" 
-
-	exit $?
-}
-
-#----------------------------------------------------------
-function _run_cendol() {
-    ${QEMU} \
-	-hda ${BASEDIR}/${DIFFIMGDIR}/fedora14.cendol.qcow2.img \
-	-cdrom ${ISODIR}/Fedora-14-i386-disc1.iso \
-	-boot c \
-	-vga std \
-	-monitor stdio \
-	-soundhw es1370 \
-	-m 256 \
-	-localtime \
-	-net nic,vlan=1 \
-	-net tap,vlan=1,ifname=tap3,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-	-name "cendol" 
-}
-
-#----------------------------------------------------------
-# move 
-#   mnajib.dyndns.org 
-# from
-#   (64-bit cpu; windows 32-bits host; virtualbox ubuntu_server 64-bits guest) 
-# to 
-#   (32-bit cpu; ubuntu 32-bits host; qemu ubuntu_server 64-bits guest)
-#
-#	TODO:
-# Check hostname!
-# ip address: 192.168.1.3
-# ssh port: 1982
-function _run_lengkuas() {
-	${QEMU64} \
-	-hda ${BASEDIR}/${DIFFIMGDIR}/Ubuntu_Server.lengkuas.vdi \
-	-boot ${BOOTHD} \
-	-cpu qemu64 \
-	-no-reboot \
-	-vga std \
-	-monitor stdio \
-	-soundhw es1370 \
-	-m 256 \
-	-localtime \
-	-net nic,vlan=0,macaddr=00:e0:4c:bd:64:bb \
-	-net tap,vlan=0,ifname=tap12,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-	-name "Ubuntu_Server.lengkuas" 
-
-	exit
-}
-
-# -nographic -monitor null -serial null 
-# -vnc 127.0.0.1:1 -usbdevice tablet -k en-us -daemonize
-# vncviewer 127.0.0.1:5901
-function _run_lengkuasvnc() {
-	${QEMU64} \
-	-hda ${BASEDIR}/${DIFFIMGDIR}/Ubuntu_Server.lengkuas.vdi \
-	-boot ${BOOTHD} \
-	-cpu qemu64 \
-	-no-reboot \
-	-soundhw es1370 \
-	-m 256 \
-	-localtime \
-	-vga std \
-	-monitor stdio \
-	-vnc :1 -usbdevice tablet -k en-us \
-	-net nic,vlan=0,macaddr=00:e0:4c:bd:64:bb \
-	-net tap,vlan=0,ifname=tap12,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-	-name "Ubuntu_Server.lengkuas" 
-
-	exit
-}
 
 _run_lengkuasvde() {
 	#local README="${BASEDIR}/doc/Ubuntu_server.lengkuas.vdi.txt"
@@ -624,29 +401,6 @@ _run_lengkuasvde() {
 	exit
 }
 
-#----------------------------------------------------------
-		#-cdrom ${ISODIR}/FreeBSD-8.1-RELEASE-i386-disc1.iso \
-		#-hda ${BASEDIR}/${BASEIMGDIR}/freebsd-8.2.base.qcow2 \
-		#-hda ${BASEDIR}/${DIFFIMGDIR}/freebsd-8.2.bingka.qcow2 \
-		#-hda ${BASEDIR}/${BASEIMGDIR}/freebsd-8.2.base-v0.1.qcow2 \
-function _run_bingka() {
-	${QEMU32} \
-		-hda ${BASEDIR}/${DIFFIMGDIR}/freebsd-8.2.bingka.qcow2 \
-		-cdrom ${ISODIR3}/_freebsd-8.2/FreeBSD-8.2-RELEASE-i386-disc1.iso \
-		-boot ${BOOTHD} \
-		-vga std \
-		-monitor stdio \
-		-soundhw es1370 \
-		-m 256 \
-		-no-reboot \
-		-cpu qemu32 \
-		-localtime \
-		-net nic,vlan=0,macaddr=00:e0:4c:bd:64:ba \
-		-net tap,vlan=0,ifname=tap8,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-		-name "bingka"
-}
-
-		#-net nic,macaddr=00:e0:4c:bd:64:ba,model=e1000 \
 function _run_bingkavde() {
 	echo "README: ${BASEDIR}/doc/freebsd-8.2.bingka.qcow2.txt"
 
@@ -735,42 +489,6 @@ ${QEMU64} \
 }
 
 #----------------------------------------------------------
-function _run_tempoyak() {
-	${QEMU32} \
-		-hda ${BASEDIR}/${DIFFIMGDIR}/freebsd-8.2.tempoyak.qcow2 \
-		-cdrom ${ISODIR3}/_freebsd-8.2/FreeBSD-8.2-RELEASE-i386-disc1.iso \
-		-boot ${BOOTHD} \
-		-cpu qemu32 \
-		-no-reboot \
-		-monitor stdio \
-		-soundhw es1370 \
-		-vga std \
-		-m 256 \
-		-localtime \
-		-net nic,vlan=0,macaddr=00:e0:4c:bd:64:bd \
-		-net tap,vlan=0,ifname=tap17,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-		-name "tempoyak"
-}
-
-#----------------------------------------------------------
-function _run_belacan() {
-	${QEMU32} \
-		-hda ${BASEDIR}/${DIFFIMGDIR}/freebsd-8.2.belacan.qcow2 \
-		-cdrom ${ISODIR3}/_freebsd-8.2/FreeBSD-8.2-RELEASE-i386-disc1.iso \
-		-boot ${BOOTHD} \
-		-cpu qemu32 \
-		-no-reboot \
-		-monitor stdio \
-		-soundhw es1370 \
-		-vga std \
-		-m 256 \
-		-localtime \
-		-net nic,vlan=0,macaddr=00:e0:4c:bd:64:be \
-		-net tap,vlan=0,ifname=tap18,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-		-name "belacan"
-}
-	#${QEMU32VDE} \
-		#-cdrom ${ISODIR3}/_freebsd-8.2/FreeBSD-8.2-RELEASE-i386-disc1.iso \
 _run_belacanvde() {
 	echo "README: ${BASEDIR}/doc/freebsd-8.2.belacan.qcow2.txt"
 
@@ -789,10 +507,10 @@ _run_belacanvde() {
 }
 
 #----------------------------------------------------------
-		#-hda ${BASEDIR}/${DIFFIMGDIR}/freebsd-8.2.belacan.qcow2 \
 _run_kelapavde() {
 	echo "README: ${BASEDIR}/doc/ubuntu-11.04-server.kelapa.qcow2.txt"
 
+		#-hda ${BASEDIR}/${DIFFIMGDIR}/freebsd-8.2.belacan.qcow2 \
 		#-net nic,macaddr=00:e0:4c:bd:a1:aa,model=rtl8139 \
 	${QEMU32} \
 		-hda ${BASEDIR}/${BASEIMGDIR}/ubuntu-11.04-server.kelapa.qcow2 \
@@ -833,119 +551,6 @@ _run_amandavde() {
 }
 
 #----------------------------------------------------------
-function _run_perahu() {
-	${QEMU32} \
-		-hda ${BASEDIR}/${DIFFIMGDIR}/gobolinux.perahu.qcow2 \
-		-cdrom ${ISODIR}/GoboLinux-014.01-i686.iso \
-		-boot ${BOOTHD} \
-		-cpu qemu32 \
-		-no-reboot \
-		-monitor stdio \
-		-soundhw es1370 \
-		-vga std \
-		-m 256 \
-		-localtime \
-		-net nic,vlan=0,macaddr=00:e0:4c:bd:64:bc \
-		-net tap,vlan=0,ifname=tap6,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-		-name "perahu"
-
-	#${QEMU32} -cpu qemu32 -monitor stdio -soundhw es1370 -vga std -m 256 -localtime -cdrom ${ISODIR}/GoboLinux-014.01-i686.iso -hda ${BASEDIR}/${DIFFIMGDIR}/gobolinux.perahu.qcow2 -boot ${BOOTHD} -net nic,vlan=0,macaddr=00:e0:4c:bd:64:bc -net tap,vlan=0,ifname=tap5,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown -name "perahu"
-	#qemu -cpu qemu32 -monitor stdio -soundhw es1370 -vga std -m 256 -localtime -cdrom /mnt/c/DATA/_iso/GoboLinux-014.01-i686.iso -hda /mnt/data/DATA/_master/_vm/_qemu/img/diff/gobolinux.perahu.qcow2 -boot c -net nic,vlan0,macaddr=00:e0:4d:bd:64:bc -net tap,vlan=0,ifname=tap5,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown -name "perahu"
-	#qemu -cpu qemu32 -monitor stdio -soundhw es1370 -vga std -m 256 -localtime -cdrom /mnt/c/DATA/_iso/GoboLinux-014.01-i686.iso -hda /mnt/data/DATA/_master/_vm/_qemu/img/diff/gobolinux.perahu.qcow2 -boot c -net nic,macaddr=00:e0:4d:bd:64:bc -net tap,ifname=tap5,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown -name "perahu"
-
-	exit
-}
-
-#----------------------------------------------------------
-function _run_lempok() {
-    ${QEMU} \
-	-hda ${BASEDIR}/${DIFFIMGDIR}/fedora14.lempok.qcow2.img \
-	-cdrom ${ISODIR}/Fedora-14-i386-disc1.iso \
-	-boot ${BOOTHD} \
-	-monitor stdio \
-	-soundhw es1370 \
-	-vga std \
-	-m 256 \
-	-localtime \
-	-net nic,vlan=1 \
-	-net tap,vlan=1,ifname=tap4,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-	-name "lempok" 
-}
-
-
-#----------------------------------------------------------
-# http://alien.slackbook.org/dokuwiki/doku.php?id=slackware:qemu
-_runTestWinXP() {
-	#!/bin/sh
-	#
-	# Start Windows XP Pro in QEMU using VDE for better network support
-	 
-	PARAMS=$*
-	 
-	# Qemu can use SDL sound instead of the default OSS
-	export QEMU_AUDIO_DRV=sdl
-	 
-	# Whereas SDL can play through alsa:
-	export SDL_AUDIODRIVER=alsa
-	 
-	# Change this to the directory where _you_ keep your QEMU images:
-	IMAGEDIR=/home/alien/QEMU
-	 
-	# Change this to the directory where _you_ keep your installation CDROM's ISO images:
-	ISODIR=/home/alien/ISOS
-	 
-	# Now, change directory to your image directory
-	cd $IMAGEDIR
-	 
-	# If you want to boot from the WinXP CD add a '-boot d' parameter to the commandline;
-	#   if you don't need the CDROM present in the VM, leave '-cdrom ${ISODIR}/winxp_pro_us.iso' out:
-	# I made the MAC address up - make sure it is unique on your (virtual) network.
-	 
-	# This command returns to the command prompt immediately,
-	#   and QEMU's error output is redirected to files.
-	vdeqemu -net vde,vlan=0 -net nic,vlan=0 -m 256 -localtime -soundhw all -hda winxp.img -cdrom ${ISODIR}/winxp_pro_us.iso  1>winxp.log 2>winxp.err ${PARAMS} &
-}
-
-# Create tun-tap device?
-_createTun() {
-	modprobe tun
-
-	mkdir /dev/net
-	mknod /dev/net/tun c 10 200
-	chmod 660 /dev/net/tun
-}
-
-#----------------------------------------------------------
-function _runInTempTestMode() {
-  # TODO: run in temporary snapshot mode, not save/update the disk image.
-  # the image will be back untouch after reboot
-
-  macaddress=""
-
-  #sudo env TMPDIR=/var/whatever qemu
-  #
-  # OR
-  # To run the qumu as root user with env variable TMPDIR=
-  # The default qemu TMPDIR="/tmp"; was hardcoded in block.c
-  #su -
-  TMPDIR=/mnt/data \
-	${QEMU} \
-	-snapshot \
-	-hda ${BASEDIR}/${DIFFIMGDIR}/fedora14.dodol.qcow2.img \
-	-cdrom ${ISODIR}/Fedora-14-i386-disc1.iso \
-	-boot c \
-	-monitor stdio \
-	-soundhw es1370 \
-	-vga std \
-	-m 256 \
-	-localtime \
-	-net nic,vlan=0 \
-	-net tap,vlan=0,ifname=tap0,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown \
-	-name "dodol-TEMPSNAPSHOT" 
-  #...
-}
-
-#----------------------------------------------------------
 _runNoMon() {
 	echo "no monitor display, but with vnc service"
 	# TODO: ...
@@ -953,25 +558,12 @@ _runNoMon() {
 }
 
 #----------------------------------------------------------
-
-#run_base # run for first install only! <----- !!! WARNING !!!
+#run_base     # run for every first install guest only! <----- !!! WARNING !!!
 #_startvdenet # should only run once!
-#_stopvdenet 	# should only run once!
-#_run_lengkuas
-#_run_lengkuasvnc
-#_run_dodol
-#_run_cendol
-#_run_lempok
-#_run_budu
-#_run_bingka
+#_stopvdenet  # should only run once!
 #_run_bingkavde
-#_run_tempoyak
-#_run_belacan
-#_run_belacanvde
-#_run_perahu
 
 #----------------------------------------------------------
-
 _printHost() {
 	echo "HOSTNAME := [ vdeswitch | lengkuas | belacan | bingka | kelapa | bahulu | asamkeping | amanda ]"
 }
@@ -1037,17 +629,21 @@ _main2() {
 
   case $svrname in
     vdeswitch)	        _startvdenet;;		# 
+#   ------------------- ----------------------- --------------------------------------------------------------
+#   hostname            start script            notes
+#   ------------------- ----------------------- --------------------------------------------------------------
     lengkuas)		_run_lengkuasvde;; 	# ubuntu server: wordpress
     belacan) 		_run_belacanvde;;	# freebsd: version control
-    bingka)		_run_bingkavde;;	# freebsd: 
+    bingka)		_run_bingkavde;;	# freebsd: puppet
     kelapa)		_run_kelapavde;;	# kelapa: chat server; ircd, sshd, ... 
     cencalok)
-			#_run_cencalokvde 	# freebsd: dns for subdomain _.najib.magnifix.com.my
+			#_run_cencalokvde 	# freebsd: dns for subdomain ...
                         echo "TODO: ..."
                         ;;				
-    bahulu)		_run_bahulu;; 		# archlinux x386: dns for subdomain _.najib.magnifix.com.my
-    asamkeping)		_run_asamkeping;;	# archlinux x86_64: dns for subdomain _.najib.magnifix.com.my
+    bahulu)		_run_bahulu;; 		# archlinux x386: dns for subdomain ...
+    asamkeping)		_run_asamkeping;;	# archlinux x86_64: dns for subdomain ...
     amanda)		_run_amandavde;;        # 
+#   ------------------- ----------------------- --------------------------------------------------------------
     help)
                         ;;
     '')					
