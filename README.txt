@@ -1,0 +1,3 @@
+Bismillaahirrahmaanirrahiim
+Bacalah olehmu
+
